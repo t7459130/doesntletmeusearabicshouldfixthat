@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arabic Livestream Translator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f0; color: #1a1a1a; padding: 24px; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+  .sub { font-size: 14px; color: #666; margin-bottom: 20px; }
+  .card { background: white; border: 1px solid #e0e0d8; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .api-row { display: flex; gap: 8px; }
+  .api-row input { flex: 1; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+  button { padding: 9px 18px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; cursor: pointer; background: white; }
+  .btn-start { background: #1D9E75; color: white; border-color: #1D9E75; }
+  .btn-start:hover { background: #0F6E56; }
+  .btn-stop { background: white; color: #c0392b; border-color: #c0392b; }
+  .status { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #f5f5f0; border-radius: 8px; font-size: 14px; color: #555; margin-bottom: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+  .dot.active { background: #1D9E75; animation: pulse 1.2s infinite; }
+  .dot.error { background: #e74c3c; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+  iframe { width: 100%; aspect-ratio: 16/9; border: none; border-radius: 8px; margin-bottom: 16px; }
+  .steps { list-style: none; counter-reset: s; }
+  .steps li { counter-increment: s; display: flex; gap: 10px; font-size: 13px; color: #555; margin-bottom: 8px; line-height: 1.5; }
+  .steps li::before { content: counter(s); min-width: 20px; height: 20px; border-radius: 50%; background: #f0f0ea; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px; font-weight: 600; }
+  .t-box { min-height: 120px; max-height: 300px; overflow-y: auto; }
+  .t-entry { border-bottom: 1px solid #f0f0ea; padding: 10px 0; }
+  .t-entry:last-child { border: none; }
+  .t-arabic { font-size: 12px; color: #aaa; direction: rtl; text-align: right; margin-bottom: 4px; }
+  .t-english { font-size: 15px; line-height: 1.5; }
+  .t-time { font-size: 11px; color: #aaa; margin-top: 3px; }
+  .empty { text-align: center; color: #aaa; font-size: 14px; padding: 32px 0; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
+  select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; }
+  input[type=range] { width: 100%; }
+  .highlight { background: #eaf7f1; border: 1px solid #a8dfc8; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #0F6E56; margin-bottom: 10px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .badge { display: inline-block; background: #eaf7f1; color: #0F6E56; border-radius: 6px; font-size: 12px; padding: 2px 8px; margin-left: 8px; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<h1>🕌 Arabic Livestream Translator <span class="badge">Groq — Free</span></h1>
+<p class="sub">Arabic speech → Groq Whisper (transcribe) → Groq LLaMA (translate) → browser voice</p>
+
+<iframe src="https://www.youtube.com/embed/fZvuHkHYaXk?autoplay=0" allowfullscreen allow="autoplay"></iframe>
+
+<div class="card">
+  <div class="label">Groq API Key</div>
+  <div class="api-row">
+    <input type="password" id="apiKey" placeholder="gsk_..." />
+    <button onclick="saveKey()">Save</button>
+  </div>
+  <p style="font-size:12px;color:#aaa;margin-top:6px">Free key from console.groq.com/keys — stays in your browser only.</p>
+</div>
+
+<div class="card">
+  <div class="label">How to capture the stream audio</div>
+  <div class="highlight">✓ Open this file in Chrome or Edge — Firefox won't work for tab audio capture</div>
+  <ul class="steps">
+    <li>Make sure the YouTube stream above is <strong>playing and unmuted</strong></li>
+    <li>Click <strong>Start translating</strong> — a screen share popup appears</li>
+    <li>Click the <strong>"Chrome Tab"</strong> tab at the top of the popup</li>
+    <li>Select <strong>this tab</strong> from the list</li>
+    <li>Tick <strong>"Also share tab audio"</strong> checkbox at the bottom</li>
+    <li>Click <strong>Share</strong> — first translation arrives in ~6 seconds</li>
+  </ul>
+</div>
+
+<div class="status"><div class="dot" id="dot"></div><span id="statusText">Ready — paste your Groq key then press start</span></div>
+
+<div class="btn-row">
+  <button class="btn-start" id="btnStart" onclick="startTranslating()">▶ Start translating</button>
+  <button class="btn-stop" id="btnStop" onclick="stopTranslating()" style="display:none">⏹ Stop</button>
+</div>
+
+<div class="card">
+  <div class="label">Voice settings</div>
+  <div class="settings-grid">
+    <div>
+      <label>Voice</label>
+      <select id="voiceSelect"></select>
+    </div>
+    <div>
+      <label>Speed <span id="rateVal" style="color:#aaa">1.0×</span></label>
+      <input type="range" id="rateSlider" min="0.6" max="1.8" step="0.1" value="1.0"
+        oninput="document.getElementById('rateVal').textContent=parseFloat(this.value).toFixed(1)+'×'">
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="label">Translations</div>
+  <div class="t-box" id="tbox">
+    <div class="empty" id="empty">Translations will appear here once you start</div>
+  </div>
+</div>
+
+<script>
+let mediaRecorder, audioChunks = [], captureStream, isRunning = false, cycleTimeout;
+const CHUNK_MS = 6000;
+
+function saveKey() {
+  const k = document.getElementById('apiKey').value.trim();
+  if (!k.startsWith('gsk_')) { setStatus('Groq keys start with gsk_', 'error'); return; }
+  sessionStorage.setItem('groq_key', k);
+  setStatus('Groq API key saved', '');
+}
+
+function getKey() {
+  return document.getElementById('apiKey').value.trim() || sessionStorage.getItem('groq_key') || '';
+}
+
+function setStatus(msg, state) {
+  document.getElementById('statusText').textContent = msg;
+  const d = document.getElementById('dot');
+  d.className = 'dot' + (state === 'active' ? ' active' : state === 'error' ? ' error' : '');
+}
+
+async function startTranslating() {
+  const key = getKey();
+  if (!key) { setStatus('Enter your Groq API key first', 'error'); return; }
+
+  setStatus('Requesting tab audio — pick this tab and tick "Share tab audio"…', '');
+  try {
+    captureStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+  } catch (e) {
+    setStatus('Capture cancelled: ' + e.message, 'error'); return;
+  }
+
+  const audioTracks = captureStream.getAudioTracks();
+  if (!audioTracks.length) {
+    setStatus('No audio captured — did you tick "Also share tab audio"?', 'error');
+    captureStream.getTracks().forEach(t => t.stop()); return;
+  }
+
+  captureStream.getVideoTracks().forEach(t => t.stop());
+  const audioOnly = new MediaStream(audioTracks);
+
+  const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+  mediaRecorder = new MediaRecorder(audioOnly, mimeType ? { mimeType } : {});
+  audioChunks = [];
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+  mediaRecorder.onstop = processChunk;
+
+  isRunning = true;
+  document.getElementById('btnStart').style.display = 'none';
+  document.getElementById('btnStop').style.display = 'inline-flex';
+  setStatus('Listening… translating every 6 seconds', 'active');
+
+  function cycle() {
+    if (!isRunning) return;
+    audioChunks = [];
+    mediaRecorder.start();
+    setTimeout(() => { try { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); } catch(e){} }, CHUNK_MS);
+    cycleTimeout = setTimeout(cycle, CHUNK_MS + 400);
+  }
+  cycle();
+}
+
+async function processChunk() {
+  if (!audioChunks.length) return;
+  const mimeType = mediaRecorder.mimeType || 'audio/webm';
+  const blob = new Blob(audioChunks, { type: mimeType });
+  if (blob.size < 500) return;
+
+  const key = getKey();
+  const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
+
+  // Step 1: Transcribe Arabic audio with Groq Whisper
+  let arabicText = '';
+  try {
+    const fd = new FormData();
+    fd.append('file', blob, 'audio.' + ext);
+    fd.append('model', 'whisper-large-v3');
+    fd.append('language', 'ar');
+    fd.append('response_format', 'json');
+
+    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + key },
+      body: fd
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setStatus('Transcription error: ' + (err.error?.message || res.status), 'error'); return;
+    }
+    const data = await res.json();
+    arabicText = (data.text || '').trim();
+  } catch(e) {
+    setStatus('Transcription network error: ' + e.message, 'error'); return;
+  }
+
+  if (!arabicText || arabicText.length < 2) {
+    setStatus('Listening… (no speech detected)', 'active'); return;
+  }
+
+  // Step 2: Translate Arabic text to English with Groq LLaMA
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: 'You are a strict literal Arabic-to-English translator. Rules: 1) Translate ONLY what is written, word for word. 2) Do NOT add, invent, or expand anything. 3) If the text is a name, transliterate it as-is. 4) If the text is too short or unclear to translate, output a single dash: - 5) Output ONLY the translation, no notes, no explanations.' },
+          { role: 'user', content: arabicText }
+        ],
+        max_tokens: 300,
+        temperature: 0.2
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setStatus('Translation error: ' + (err.error?.message || res.status), 'error'); return;
+    }
+    const data = await res.json();
+    const english = (data.choices?.[0]?.message?.content || '').trim();
+    if (english.length > 2 && english !== '-') {
+      addEntry(arabicText, english);
+      speak(english);
+    }
+    setStatus('Listening… translating every 6 seconds', 'active');
+  } catch(e) {
+    setStatus('Translation network error: ' + e.message, 'error');
+  }
+}
+
+function addEntry(arabic, english) {
+  const box = document.getElementById('tbox');
+  const em = document.getElementById('empty');
+  if (em) em.remove();
+  const now = new Date().toLocaleTimeString('en-GB');
+  const div = document.createElement('div');
+  div.className = 't-entry';
+  div.innerHTML = `<div class="t-arabic">${arabic}</div><div class="t-english">${english}</div><div class="t-time">${now}</div>`;
+  box.prepend(div);
+  if (box.children.length > 50) box.lastChild.remove();
+}
+
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-GB';
+  u.rate = parseFloat(document.getElementById('rateSlider').value);
+  const name = document.getElementById('voiceSelect').value;
+  const v = speechSynthesis.getVoices().find(x => x.name === name);
+  if (v) u.voice = v;
+  speechSynthesis.speak(u);
+}
+
+function stopTranslating() {
+  isRunning = false;
+  clearTimeout(cycleTimeout);
+  try { if (mediaRecorder?.state !== 'inactive') mediaRecorder.stop(); } catch(e){}
+  captureStream?.getTracks().forEach(t => t.stop());
+  document.getElementById('btnStart').style.display = 'inline-flex';
+  document.getElementById('btnStop').style.display = 'none';
+  setStatus('Stopped', '');
+}
+
+function loadVoices() {
+  const sel = document.getElementById('voiceSelect');
+  const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+  sel.innerHTML = '';
+  voices.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v.name; o.textContent = v.name;
+    sel.appendChild(o);
+  });
+  const pref = voices.find(v => /Google|Natural|Neural|Premium/i.test(v.name));
+  if (pref) sel.value = pref.name;
+}
+if (speechSynthesis.getVoices().length) loadVoices();
+speechSynthesis.addEventListener('voiceschanged', loadVoices);
+</script>
+</body>
+</html>
